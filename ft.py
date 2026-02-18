@@ -69,7 +69,7 @@ def run_server(port, outdir):
             conn.sendall(b"ACK")
 
         except:
-            # If error happens, just ignore and continue
+            # If error happens, ignore and continue
             pass
 
         conn.close()
@@ -116,11 +116,17 @@ def run_client(server_ip, port, filepath):
 
         file.close()
 
-        # Wait for ACK
-        ack = client_socket.recv(3)
+        # -------- FIXED ACK PART --------
+        # Wait for ACK (make sure we read all 3 bytes)
+        ack = b""
+        while len(ack) < 3:
+            part = client_socket.recv(3 - len(ack))
+            if not part:
+                break
+            ack += part
+        # --------------------------------
 
         if ack == b"ACK":
-            print("File sent successfully.")
             sys.exit(0)
         else:
             sys.exit(255)
