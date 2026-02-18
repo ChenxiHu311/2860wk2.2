@@ -9,9 +9,7 @@ import sys
 BUFFER_SIZE = 1024
 
 
-# =========================
 # Helper function to receive exact number of bytes
-# =========================
 def recv_all(sock, size):
     data = b""
     while len(data) < size:
@@ -35,24 +33,16 @@ def run_server(port, outdir):
         conn, addr = server_socket.accept()
 
         try:
-            # Receive filename length (4 bytes)
-            data = recv_all(conn, 4)
-            if data is None:
+            # Receive filename (as plain string)
+            filename_bytes = conn.recv(1024)
+            if not filename_bytes:
                 conn.close()
                 continue
 
-            name_length = struct.unpack("!I", data)[0]
-
-            # Receive filename
-            filename_bytes = recv_all(conn, name_length)
-            if filename_bytes is None:
-                conn.close()
-                continue
-
-            filename = filename_bytes.decode()
+            filename = filename_bytes.decode().strip()
             output_path = os.path.join(outdir, filename + "-received")
 
-            # Reject if file already exists
+            # Check if file already exists
             if os.path.exists(output_path):
                 conn.sendall(b"NO")
                 conn.close()
@@ -60,7 +50,7 @@ def run_server(port, outdir):
             else:
                 conn.sendall(b"OK")
 
-            # Receive file size (8 bytes)
+            # Receive file size (8 bytes unsigned)
             size_data = recv_all(conn, 8)
             if size_data is None:
                 conn.close()
@@ -81,7 +71,7 @@ def run_server(port, outdir):
 
             file.close()
 
-            # Send ACK
+            # Send acknowledgement
             conn.sendall(b"ACK")
 
         except:
@@ -100,21 +90,18 @@ def run_client(server_ip, port, filepath):
         client_socket.connect((server_ip, port))
 
         filename = os.path.basename(filepath)
-        filename_bytes = filename.encode()
 
-        # Send filename length
-        client_socket.sendall(struct.pack("!I", len(filename_bytes)))
+        # Send filename (plain string)
+        client_socket.sendall(filename.encode())
 
-        # Send filename
-        client_socket.sendall(filename_bytes)
-
-        # Wait for response
+        # Wait for server response
         response = recv_all(client_socket, 2)
+
         if response != b"OK":
             client_socket.close()
             sys.exit(1)
 
-        # Send file size
+        # Send file size (8-byte unsigned integer)
         file_size = os.path.getsize(filepath)
         client_socket.sendall(struct.pack("!Q", file_size))
 
