@@ -33,8 +33,14 @@ def run_server(port, outdir):
         conn, addr = server_socket.accept()
 
         try:
-            # Receive filename (as plain string)
-            filename_bytes = conn.recv(1024)
+            # Receive filename until newline
+            filename_bytes = b""
+            while not filename_bytes.endswith(b"\n"):
+                part = conn.recv(1)
+                if not part:
+                    break
+                filename_bytes += part
+
             if not filename_bytes:
                 conn.close()
                 continue
@@ -91,8 +97,8 @@ def run_client(server_ip, port, filepath):
 
         filename = os.path.basename(filepath)
 
-        # Send filename (plain string)
-        client_socket.sendall(filename.encode())
+        # Send filename with newline
+        client_socket.sendall((filename + "\n").encode())
 
         # Wait for server response
         response = recv_all(client_socket, 2)
